@@ -17,4 +17,4 @@ This project focuses on the **temporal resampling** of high-resolution climate d
 The notebook utilizes **Pandas** for time-series manipulation, converting high-frequency meteorological data into standardized monthly indicators to facilitate the identification of drought persistence and recovery phases.
 
 ---
-*Research focus: Environmental Data Science and Climate Variability.*
+

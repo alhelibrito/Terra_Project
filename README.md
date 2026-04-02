@@ -18,3 +18,32 @@ The notebook utilizes **Pandas** for time-series manipulation, converting high-f
 
 ---
 
+## Local Development Setup
+
+### Prerequisites
+
+- [Python 3](https://www.python.org/downloads/) installed and available as `python3`
+- [VS Code](https://code.visualstudio.com/) with the **Jupyter** and **Python** extensions
+  - When you open this repo in VS Code, it will prompt you to install recommended extensions automatically
+
+### One-time setup
+
+From the project root, run:
+
+```bash
+bash init.sh
+```
+
+This will:
+1. Create a `terra_env` virtual environment
+2. Install all dependencies from `requirements.txt`
+3. Register a `Terra Project` Jupyter kernel for your user
+
+### Selecting the kernel in a notebook
+
+This step must be done manually in VS Code:
+
+1. Open a `.ipynb` notebook file
+2. In top right, click 'Select Kernel' > 'Python Environments' > 'venv'
+
+VS Code will remember this selection per notebook once set.

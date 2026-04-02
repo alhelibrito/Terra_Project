@@ -1,4 +1,12 @@
+# Pre-commit hooks for code quality and consistency
+pre-commit
+
+# Jupyter notebook development and version control tools
 ipykernel
+nbdime
+nbstripout
+
+# Data analysis and visualization libraries
 pandas
 numpy
 matplotlib

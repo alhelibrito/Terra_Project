@@ -44,8 +44,6 @@ This will:
 This step must be done manually in VS Code:
 
 1. Open a `.ipynb` notebook file
-2. Click on the kernel picker in the top right of the notebook
-3. Choose `terra_env` as your kernel
+2. In top right, click 'Select Kernel' > 'Python Environments' > 'venv'
 
 VS Code will remember this selection per notebook once set.
-

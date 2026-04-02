@@ -24,4 +24,4 @@ python3 -m ipykernel install --user --name=terra_kernel --display-name "Terra Pr
 echo ""
 echo "Setup complete. Next steps:"
 echo "  1. In VS Code, install recommended extensions when prompted (Jupyter, Python)."
-echo "  2. Open a notebook, click 'Select Kernel' > 'Jupyter Kernel' > 'Terra Project'."
+echo "  2. Open a notebook, click 'Select Kernel' > 'terra_env'

@@ -1,4 +1,4 @@
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alhelibrito/Terra_Project/blob/main/PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alhelibrito/Terra_Project/blob/main/notebooks/PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb)
 
 # Terra_Project: PDSI Resampling & Trend Analysis
 

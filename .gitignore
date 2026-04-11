@@ -16,3 +16,6 @@ __pycache__/
 
 # Virtual environment
 venv/
+
+# Web configuration
+web/config.js

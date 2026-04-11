@@ -1,0 +1,5 @@
+[build]
+  # Generates config.js from the MAPBOX_TOKEN environment variable,
+  # then publishes the web/ directory as a static site.
+  command     = "echo \"const MAPBOX_TOKEN = '$MAPBOX_TOKEN';\" > web/config.js"
+  publish     = "web"

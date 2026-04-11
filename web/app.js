@@ -33,8 +33,8 @@ const OSM_STYLE = {
 const map = new mapboxgl.Map({
     container: 'map',
     style: OSM_STYLE,
-    center: [0, 20],       // longitude, latitude
-    zoom: 2,
+    center: [-98.5, 39.5], // contiguous US center
+    zoom: 4.3,
     projection: 'globe',   // renders as a 3-D globe at low zoom levels
     antialias: true
 });

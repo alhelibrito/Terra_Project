@@ -10,7 +10,9 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=1000']
       - id: end-of-file-fixer
+        exclude: '\.md$'
       - id: trailing-whitespace
+        exclude: '\.md$'
 
   - repo: https://github.com/nbQA-dev/nbQA
     rev: 1.7.0

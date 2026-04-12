@@ -1,4 +1,4 @@
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alhelibrito/Terra_Project/blob/main/PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alhelibrito/Terra_Project/blob/main/notebooks/PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb)
 
 # Terra_Project: PDSI Resampling & Trend Analysis
 
@@ -9,7 +9,7 @@ This project focuses on the **temporal resampling** of high-resolution climate d
 * **Trend Visualization:** Identifying seasonal variations in the Palmer Drought Severity Index (PDSI) using standardized classification thresholds.
 
 ### **Latest Analysis Result:**
-![Monthly PDSI Analysis](Monthly%20PDSI%20analysis.png)
+![Monthly PDSI Analysis](output_files/Monthly%20PDSI%20analysis.png)
 *Figure 1: High-contrast visualization of monthly PDSI trends, highlighting the rapid hydrological shifts observed in 2025.*
 
 ### **Methodology & Standards:**
@@ -20,9 +20,9 @@ Data processing is performed via **Python (Pandas/Seaborn)**. To ensure internat
 * **>2.0**: Unusually Moist (Green)
 
 ### **Repository Contents:**
-* **Input:** [`pentads_pdsi_wdm_2022_2025.csv`](https://raw.githubusercontent.com/alhelibrito/Terra_Project/main/pentads_pdsi_wdm_2022_2025.csv) — Original 5-day resolution data.
-* **Notebook:** [`PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb`](https://github.com/alhelibrito/Terra_Project/blob/main/PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb) — Main processing pipeline (Cleaning → Resampling → Plotting).
-* **Output:** [`monthly_pdsi_wdm_2022_2025.csv`](https://raw.githubusercontent.com/alhelibrito/Terra_Project/main/monthly_pdsi_wdm_2022_2025.csv) — Final processed monthly dataset.
+* **Input:** [`pentads_pdsi_wdm_2022_2025.csv`](input_files/pentads_pdsi_wdm_2022_2025.csv) — Original 5-day resolution data.
+* **Notebook:** [`PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb`](notebooks/PDSI_pentads_to_monthly_Des_Moines_2022_2025.ipynb) — Main processing pipeline (Cleaning  → Resampling → Plotting).
+* **Output:** [`monthly_pdsi_wdm_2022_2025.csv`](output_files/monthly_pdsi_wdm_2022_2025.csv) — Final processed monthly dataset.
 
 ---
 

@@ -12,9 +12,14 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.DS_Store
 
 # Virtual environment
 venv/
 
-# Output artifacts
-output_files
+# Web configuration
+web/config.js
+
+# Generated from input_files/datacenters.csv at build time — do not commit
+web/data.js
+functions/datacenter-data.js

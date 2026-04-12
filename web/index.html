@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terra Project</title>
+
+    <!-- Mapbox GL JS v3.20.0 -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.20.0/mapbox-gl.css" rel="stylesheet" />
+
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="app">
+
+        <!-- ── Left: data panel ────────────────────── -->
+        <aside id="left-pane">
+            <header id="sidebar-header">
+                <h1>Terra Project</h1>
+                <p id="location-hint">Click a datacenter on the map to explore data</p>
+            </header>
+
+            <div id="selected-location">
+                <!-- populated by app.js when user clicks the map -->
+            </div>
+
+            <div id="charts-container">
+                <div class="empty-state">
+                    <div class="empty-icon">&#9698;</div>
+                    <p>Charts will appear here once a location is selected.</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ── Right: map ──────────────────────────── -->
+        <main id="right-pane">
+            <div id="map"></div>
+        </main>
+
+    </div>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.20.0/mapbox-gl.js"></script>
+    <script src="config.js"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

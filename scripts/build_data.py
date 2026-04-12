@@ -1,8 +1,13 @@
 """
-Converts input_files/datacenters.csv into web/data.js.
+Converts input_files/datacenters.csv into two generated files:
 
-The output file assigns a GeoJSON FeatureCollection to window.DATACENTER_GEOJSON
-so it can be used directly by app.js without any runtime CSV fetch.
+  web/data.js
+    Loaded by the browser. Contains only coordinates + IDs — the minimum
+    needed to render map markers. No metadata is included.
+
+  functions/datacenter-data.js
+    Required by the Netlify Function. Contains the full record for every
+    datacenter, keyed by ID. This file is never served as a static asset.
 
 Run from the project root:
     python3 scripts/build_data.py
@@ -12,11 +17,14 @@ import csv
 import json
 import os
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CSV_PATH = os.path.join(ROOT, 'input_files', 'datacenters.csv')
-OUT_PATH = os.path.join(ROOT, 'web', 'data.js')
+ROOT         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CSV_PATH     = os.path.join(ROOT, 'input_files', 'datacenters.csv')
+WEB_OUT      = os.path.join(ROOT, 'web', 'data.js')
+FUNC_OUT     = os.path.join(ROOT, 'functions', 'datacenter-data.js')
 
 features = []
+lookup   = {}
+
 with open(CSV_PATH, newline='', encoding='utf-8') as f:
     reader = csv.DictReader(f)
     for row in reader:
@@ -25,21 +33,29 @@ with open(CSV_PATH, newline='', encoding='utf-8') as f:
             lng = float(row['Longitude'])
         except (ValueError, KeyError):
             continue
+
+        _id = int(row['_id'])
         features.append({
             'type': 'Feature',
-            'id': int(row['_id']),
-            'geometry': {
-                'type': 'Point',
-                'coordinates': [lng, lat]
-            },
-            'properties': {k: v for k, v in row.items()}
+            'id': _id,
+            'geometry': {'type': 'Point', 'coordinates': [lng, lat]},
+            'properties': {}          # no metadata in the browser payload
         })
+        lookup[_id] = {k: v for k, v in row.items()}
 
+# ── web/data.js — coordinates only ───────────────────────────────────────────
 geojson = {'type': 'FeatureCollection', 'features': features}
-
-with open(OUT_PATH, 'w', encoding='utf-8') as f:
+with open(WEB_OUT, 'w', encoding='utf-8') as f:
     f.write('window.DATACENTER_GEOJSON=')
     json.dump(geojson, f, separators=(',', ':'))
     f.write(';\n')
 
-print(f'build_data: wrote {len(features)} datacenters to web/data.js')
+print(f'build_data: wrote {len(features)} coordinates to web/data.js')
+
+# ── functions/datacenter-data.js — full records ───────────────────────────────
+with open(FUNC_OUT, 'w', encoding='utf-8') as f:
+    f.write('module.exports=')
+    json.dump(lookup, f, separators=(',', ':'))
+    f.write(';\n')
+
+print(f'build_data: wrote {len(lookup)} full records to functions/datacenter-data.js')

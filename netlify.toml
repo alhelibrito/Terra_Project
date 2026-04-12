@@ -1,5 +1,7 @@
 [build]
   # Generates config.js from the MAPBOX_TOKEN environment variable,
-  # then publishes the web/ directory as a static site.
+  # builds web/data.js (coordinates only) and functions/datacenter-data.js
+  # (full records, server-side only), then publishes the web/ directory.
   command     = "echo \"const MAPBOX_TOKEN = '$MAPBOX_TOKEN';\" > web/config.js && python3 scripts/build_data.py"
   publish     = "web"
+  functions   = "functions"

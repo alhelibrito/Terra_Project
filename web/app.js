@@ -107,7 +107,7 @@ function loadDatacenters() {
         map.getCanvas().style.cursor = '';
     });
 
-    map.on('click', 'datacenters-circles', (e) => {
+    map.on('click', 'datacenters-circles', async (e) => {
         const feature = e.features[0];
 
         if (selectedDcId !== null) {
@@ -116,12 +116,41 @@ function loadDatacenters() {
         selectedDcId = feature.id;
         map.setFeatureState({ source: 'datacenters', id: selectedDcId }, { selected: true });
 
-        updateSidebar(feature.properties);
+        showLoadingState();
+
+        try {
+            const res = await fetch(`/.netlify/functions/datacenter?id=${feature.id}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const props = await res.json();
+            updateSidebar(props, feature.geometry.coordinates);
+        } catch (err) {
+            console.error('Failed to fetch datacenter details:', err);
+            showErrorState();
+        }
     });
 }
 
-// ── Sidebar update ────────────────────────────────────────────────────────────
-function updateSidebar(props) {
+// ── Sidebar states ────────────────────────────────────────────────────────────
+function showLoadingState() {
+    document.getElementById('selected-location').innerHTML = `
+        <div class="location-badge">
+            <span class="dot"></span>
+            <span>Loading…</span>
+        </div>`;
+    document.getElementById('charts-container').innerHTML = `
+        <div class="empty-state">
+            <p>Fetching datacenter details…</p>
+        </div>`;
+}
+
+function showErrorState() {
+    document.getElementById('charts-container').innerHTML = `
+        <div class="empty-state">
+            <p>Could not load datacenter details.</p>
+        </div>`;
+}
+
+function updateSidebar(props, coords) {
     const locationEl = document.getElementById('selected-location');
     const chartsEl   = document.getElementById('charts-container');
 
@@ -147,6 +176,7 @@ function updateSidebar(props) {
             <span class="dc-value">${f.value}</span>
         </div>`).join('');
 
+    const [lng, lat] = coords;
     chartsEl.innerHTML = `
         <div class="chart-card dc-info">
             <h3>Datacenter Info</h3>
@@ -156,11 +186,11 @@ function updateSidebar(props) {
             <h3>Coordinates</h3>
             <div class="dc-row">
                 <span class="dc-label">Latitude</span>
-                <span class="dc-value">${parseFloat(props.Latitude).toFixed(6)}</span>
+                <span class="dc-value">${lat.toFixed(6)}</span>
             </div>
             <div class="dc-row">
                 <span class="dc-label">Longitude</span>
-                <span class="dc-value">${parseFloat(props.Longitude).toFixed(6)}</span>
+                <span class="dc-value">${lng.toFixed(6)}</span>
             </div>
         </div>`;
 }

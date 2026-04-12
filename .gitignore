@@ -22,3 +22,4 @@ web/config.js
 
 # Generated from input_files/datacenters.csv at build time — do not commit
 web/data.js
+functions/datacenter-data.js

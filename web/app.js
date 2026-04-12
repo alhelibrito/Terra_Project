@@ -51,7 +51,7 @@ map.addControl(
     'bottom-right'
 );
 
-// ── Globe atmosphere (cosmetic, only visible at low zoom) ─────────────────────
+// ── Globe atmosphere + datacenter layer ───────────────────────────────────────
 map.on('style.load', () => {
     map.setFog({
         color: 'rgb(20, 26, 40)',
@@ -60,55 +60,108 @@ map.on('style.load', () => {
         'space-color': 'rgb(5, 8, 18)',
         'star-intensity': 0.6
     });
+
+    loadDatacenters();
 });
 
-// ── Click interaction ─────────────────────────────────────────────────────────
-let activeMarker = null;
+// ── Load + display datacenters ────────────────────────────────────────────────
+let selectedDcId = null;
 
-map.on('click', (e) => {
-    const { lng, lat } = e.lngLat;
+function loadDatacenters() {
+    map.addSource('datacenters', {
+        type: 'geojson',
+        data: window.DATACENTER_GEOJSON
+    });
 
-    // Replace previous marker
-    if (activeMarker) activeMarker.remove();
+    map.addLayer({
+        id: 'datacenters-circles',
+        type: 'circle',
+        source: 'datacenters',
+        paint: {
+            'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                3, 4,
+                10, 9
+            ],
+            'circle-color': [
+                'case',
+                ['boolean', ['feature-state', 'selected'], false],
+                '#ff6b35',
+                '#4f8ef7'
+            ],
+            'circle-stroke-width': [
+                'case',
+                ['boolean', ['feature-state', 'selected'], false],
+                2.5,
+                1.5
+            ],
+            'circle-stroke-color': '#ffffff',
+            'circle-opacity': 0.9
+        }
+    });
 
-    const el = document.createElement('div');
-    el.className = 'click-marker';
+    map.on('mouseenter', 'datacenters-circles', () => {
+        map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'datacenters-circles', () => {
+        map.getCanvas().style.cursor = '';
+    });
 
-    activeMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([lng, lat])
-        .addTo(map);
+    map.on('click', 'datacenters-circles', (e) => {
+        const feature = e.features[0];
 
-    updateSidebar(lng, lat);
-});
+        if (selectedDcId !== null) {
+            map.setFeatureState({ source: 'datacenters', id: selectedDcId }, { selected: false });
+        }
+        selectedDcId = feature.id;
+        map.setFeatureState({ source: 'datacenters', id: selectedDcId }, { selected: true });
+
+        updateSidebar(feature.properties);
+    });
+}
 
 // ── Sidebar update ────────────────────────────────────────────────────────────
-function updateSidebar(lng, lat) {
+function updateSidebar(props) {
     const locationEl = document.getElementById('selected-location');
     const chartsEl   = document.getElementById('charts-container');
-
-    const fmtLng = `${Math.abs(lng).toFixed(4)}° ${lng >= 0 ? 'E' : 'W'}`;
-    const fmtLat = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'}`;
 
     locationEl.innerHTML = `
         <div class="location-badge">
             <span class="dot"></span>
-            <span>${fmtLat}, ${fmtLng}</span>
+            <span>${props.Name || 'Unknown Datacenter'}</span>
         </div>`;
 
-    // Placeholder until real charts are wired in
+    const fields = [
+        { label: 'Operator',    value: props.Operator },
+        { label: 'Location',    value: [props.City, props.State, props.Country].filter(Boolean).join(', ') },
+        { label: 'Address',     value: props.Address },
+        { label: 'Status',      value: props.Status },
+        { label: 'Power',       value: props.Power },
+        { label: 'Size',        value: props.Size },
+        { label: 'Established', value: props.Established },
+    ].filter(f => f.value);
+
+    const rows = fields.map(f => `
+        <div class="dc-row">
+            <span class="dc-label">${f.label}</span>
+            <span class="dc-value">${f.value}</span>
+        </div>`).join('');
+
     chartsEl.innerHTML = `
-        <div class="chart-card">
-            <h3>Selected coordinates</h3>
-            <p style="font-size:0.85rem; color: var(--text-secondary); line-height:1.6;">
-                Longitude: <strong style="color:var(--text-primary)">${lng.toFixed(6)}</strong><br/>
-                Latitude: &nbsp;<strong style="color:var(--text-primary)">${lat.toFixed(6)}</strong>
-            </p>
+        <div class="chart-card dc-info">
+            <h3>Datacenter Info</h3>
+            ${rows}
         </div>
         <div class="chart-card">
-            <h3>Data charts</h3>
-            <p style="font-size:0.82rem; color:var(--text-muted); line-height:1.5;">
-                Chart panels will be added here for the selected location.
-            </p>
+            <h3>Coordinates</h3>
+            <div class="dc-row">
+                <span class="dc-label">Latitude</span>
+                <span class="dc-value">${parseFloat(props.Latitude).toFixed(6)}</span>
+            </div>
+            <div class="dc-row">
+                <span class="dc-label">Longitude</span>
+                <span class="dc-value">${parseFloat(props.Longitude).toFixed(6)}</span>
+            </div>
         </div>`;
 }
 

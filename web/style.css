@@ -189,6 +189,44 @@ html, body {
     cursor: pointer;
 }
 
+/* datacenter info rows */
+.dc-info .dc-row {
+    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
+}
+
+.dc-info .dc-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.dc-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 0;
+}
+
+.dc-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.dc-value {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+/* datacenter marker — selected state glow */
+.mapboxgl-canvas-container.mapboxgl-interactive {
+    cursor: default;
+}
+
 /* ── Scrollbar styling ───────────────────────── */
 #charts-container::-webkit-scrollbar {
     width: 5px;

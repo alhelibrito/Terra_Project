@@ -12,9 +12,9 @@ Outputs:
     the nearest USGS streamflow gage, and (keyed separately) the RDC drought
     forecast time series per gage. Never served as a static asset.
 
-Uses:
-  input_files/datacenters.csv                                  — datacenter inventory
-  input_files/USGS_streamflow_drought_forecasts_*.parquet      — RDC forecasts
+Forecast data is fetched live from the USGS River DroughtCast CDN (conditions
+CSV files for weeks 0–13).  If the CDN is unreachable, falls back to a local
+parquet snapshot in input_files/.
 
 Caches NWIS site metadata under .build-cache/stations.json so repeat builds
 don't re-fetch.
@@ -25,6 +25,7 @@ Run from the project root:
 
 import csv
 import glob
+import io
 import json
 import os
 import sys
@@ -45,9 +46,17 @@ CACHE_DIR   = os.path.join(ROOT, '.build-cache')
 STATIONS_CACHE = os.path.join(CACHE_DIR, 'stations.json')
 
 NWIS_SITE_URL = 'https://waterservices.usgs.gov/nwis/site/'
-BATCH_SIZE  = 200         # USGS URL length allows ~250 ids per request
+BATCH_SIZE  = 200
 EARTH_RADIUS_KM = 6371.0
 
+RDC_CDN_BASE = (
+    'https://dfi09q69oy2jm.cloudfront.net'
+    '/visualizations/streamflow-drought-forecasts/conditions'
+)
+RDC_WEEKS = range(0, 14)  # w0 = observed, w1..w13 = forecast
+
+
+# ── Datacenter loading ────────────────────────────────────────────────────────
 
 def load_datacenters():
     rows = []
@@ -63,19 +72,65 @@ def load_datacenters():
     return rows
 
 
-def load_forecasts():
+# ── Forecast loading ──────────────────────────────────────────────────────────
+
+def fetch_forecasts_from_cdn():
+    """Fetch the 14 weekly CSVs (w0–w13) from the USGS RDC CDN.
+    Returns a DataFrame with columns [StaID, forecast_date, median_pct]."""
+    frames = []
+    for w in RDC_WEEKS:
+        url = f'{RDC_CDN_BASE}/conditions_w{w}.csv'
+        try:
+            with urllib.request.urlopen(url, timeout=15) as resp:
+                text = resp.read().decode('utf-8')
+            df = pd.read_csv(io.StringIO(text))
+            df.columns = df.columns.str.strip()
+            df = df.rename(columns={'dt': 'forecast_date', 'pd': 'median_pct'})
+            df['forecast_week'] = w
+            frames.append(df)
+        except Exception as e:
+            print(f'  CDN w{w}: failed ({e})', file=sys.stderr)
+    if not frames:
+        return None
+    combined = pd.concat(frames, ignore_index=True)
+    combined['StaID'] = combined['StaID'].astype(str).str.zfill(8)
+    combined['forecast_date'] = pd.to_datetime(combined['forecast_date']).dt.strftime('%Y-%m-%d')
+    return combined
+
+
+def load_forecasts_from_parquet():
+    """Fallback: load from the most recent local parquet snapshot."""
     matches = sorted(glob.glob(PARQUET_GLOB))
     if not matches:
-        print(f'No forecast parquet found at {PARQUET_GLOB}', file=sys.stderr)
-        return pd.DataFrame(columns=['StaID', 'forecast_date', 'median_pct',
-                                     'pred_interv_05_pct', 'pred_interv_95_pct'])
+        return None
     path = matches[-1]
-    print(f'build_data: reading forecasts from {os.path.basename(path)}')
+    print(f'build_data: (fallback) reading forecasts from {os.path.basename(path)}')
     df = pd.read_parquet(path)
     df['StaID'] = df['StaID'].astype(str).str.zfill(8)
     df['forecast_date'] = pd.to_datetime(df['forecast_date']).dt.strftime('%Y-%m-%d')
     return df
 
+
+def load_forecasts():
+    """Try USGS CDN first; fall back to local parquet."""
+    print('build_data: fetching forecasts from USGS RDC CDN (w0–w13)...')
+    df = fetch_forecasts_from_cdn()
+    if df is not None and len(df) > 0:
+        print(f'build_data: CDN returned {len(df):,} rows, '
+              f'{df["StaID"].nunique():,} stations')
+        return df
+
+    print('build_data: CDN unavailable, trying local parquet fallback')
+    df = load_forecasts_from_parquet()
+    if df is not None and len(df) > 0:
+        print(f'build_data: parquet returned {len(df):,} rows')
+        return df
+
+    print('build_data: no forecast data available', file=sys.stderr)
+    return pd.DataFrame(columns=['StaID', 'forecast_date', 'median_pct'])
+
+
+# ── NWIS station metadata ────────────────────────────────────────────────────
 
 def fetch_station_metadata(station_ids):
     """Return {station_id: {name, lat, lng}}. Uses .build-cache to avoid refetching."""
@@ -105,7 +160,7 @@ def fetch_station_metadata(station_ids):
                 parts = line.split('\t')
                 if len(parts) < 8:
                     continue
-                _, site_no, station_nm, _site_tp, _lat_dms, _lng_dms, dec_lat, dec_lng = parts[:8]
+                _, site_no, station_nm, _, _, _, dec_lat, dec_lng = parts[:8]
                 try:
                     cache[site_no] = {
                         'name': station_nm,
@@ -118,7 +173,7 @@ def fetch_station_metadata(station_ids):
 
             for sid in batch:
                 if sid not in seen_this_batch and sid not in cache:
-                    cache[sid] = None  # tombstone; don't retry next build
+                    cache[sid] = None
 
             print(f'  batch {i:>5}..{i + len(batch):>5}: +{len(seen_this_batch)}')
 
@@ -128,17 +183,32 @@ def fetch_station_metadata(station_ids):
     return {sid: cache[sid] for sid in station_ids if cache.get(sid) is not None}
 
 
+# ── Forecast index ────────────────────────────────────────────────────────────
+
 def build_forecast_index(df_forecasts, valid_station_ids):
-    """Group forecasts by station. Averages the LSTM/LightGBM model variants
-    into a single ensemble value per (station, forecast_date)."""
+    """Group forecasts by station into compact records.
+    If the DataFrame has CIs (parquet source), include them; otherwise null."""
     df = df_forecasts[df_forecasts['StaID'].isin(valid_station_ids)].copy()
-    df = (
-        df.groupby(['StaID', 'forecast_date'], as_index=False)
-          .agg(median_pct=('median_pct', 'mean'),
-               p05=('pred_interv_05_pct', 'mean'),
-               p95=('pred_interv_95_pct', 'mean'))
-          .sort_values(['StaID', 'forecast_date'])
-    )
+
+    has_ci = 'pred_interv_05_pct' in df.columns and 'pred_interv_95_pct' in df.columns
+
+    if has_ci:
+        df = (
+            df.groupby(['StaID', 'forecast_date'], as_index=False)
+              .agg(median_pct=('median_pct', 'mean'),
+                   p05=('pred_interv_05_pct', 'mean'),
+                   p95=('pred_interv_95_pct', 'mean'))
+              .sort_values(['StaID', 'forecast_date'])
+        )
+    else:
+        df = (
+            df.groupby(['StaID', 'forecast_date'], as_index=False)
+              .agg(median_pct=('median_pct', 'mean'))
+              .sort_values(['StaID', 'forecast_date'])
+        )
+        df['p05'] = None
+        df['p95'] = None
+
     out = {}
     for sta, g in df.groupby('StaID', sort=False):
         out[sta] = [
@@ -152,6 +222,8 @@ def build_forecast_index(df_forecasts, valid_station_ids):
         ]
     return out
 
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
     datacenters = load_datacenters()

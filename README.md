@@ -51,7 +51,7 @@ An interactive map that plots every datacenter in `input_files/datacenters.csv` 
 | Card | Source | Retrieved | Cached |
 |---|---|---|---|
 | Current Streamflow (cfs, percentile, category) | USGS NWIS Daily Values (`waterservices.usgs.gov/nwis/dv/`) + Daily Statistics (`/nwis/stat/`) | Netlify Function per click | In-memory per function container; historical stats TTL = 30 days |
-| 13-Week Streamflow Forecast | `input_files/USGS_streamflow_drought_forecasts_<date>.parquet` | Baked into `functions/datacenter-data.js` at build time | Static until the parquet is replaced |
+| 13-Week Streamflow Forecast | [USGS River DroughtCast CDN](https://dfi09q69oy2jm.cloudfront.net/visualizations/streamflow-drought-forecasts/conditions/) (14 weekly CSVs, `conditions_w0.csv`–`conditions_w13.csv`) | Fetched live at build time; parquet fallback if CDN is down | Refreshes every Netlify build |
 | Datacenter Info (operator, power, address…) | `input_files/datacenters.csv` | Baked into `functions/datacenter-data.js` at build time | Static |
 
 ### Build-time vs runtime data
@@ -62,9 +62,10 @@ An interactive map that plots every datacenter in `input_files/datacenters.csv` 
 - **`functions/datacenter-data.js`** — Per-datacenter metadata and nearest-gage assignment, plus the full RDC forecast time series keyed by gage ID. Server-side only, ~4.4 MB.
 
 The build:
-1. Reads `datacenters.csv` (4,682 rows) and the latest `USGS_streamflow_drought_forecasts_*.parquet` (~2,939 unique gages, 13 weekly forecasts each, averaged across the LSTM and LightGBM variants).
-2. Fetches lat/lng + site name for every forecast gage via the [USGS NWIS site service](https://waterservices.usgs.gov/nwis/site/) (batched ~200 IDs per request). Results cached locally at `.build-cache/stations.json` so subsequent builds only refetch newly-introduced gages.
-3. Uses a `BallTree` (haversine metric) to assign each datacenter to its nearest gage, writing `nearest_station_id` and `distance_km` into the datacenter record.
+1. Reads `datacenters.csv` (4,682 rows).
+2. Fetches the 14 weekly forecast CSVs (`conditions_w0.csv`–`conditions_w13.csv`) from the [USGS River DroughtCast CDN](https://dfi09q69oy2jm.cloudfront.net/visualizations/streamflow-drought-forecasts/conditions/). Week 0 is the current observed condition; weeks 1–13 are forecasts. Each CSV has columns `StaID, dt, pd` (station ID, date, percentile). If the CDN is unreachable, falls back to the most recent local parquet snapshot in `input_files/`.
+3. Fetches lat/lng + site name for every forecast gage via the [USGS NWIS site service](https://waterservices.usgs.gov/nwis/site/) (batched ~200 IDs per request). Results cached locally at `.build-cache/stations.json` so subsequent builds only refetch newly-introduced gages.
+4. Uses a `BallTree` (haversine metric) to assign each datacenter to its nearest gage, writing `nearest_station_id` and `distance_km` into the datacenter record.
 
 At runtime (each click), the Netlify Function at `functions/datacenter.js`:
 1. Looks up the datacenter record by numeric ID.
@@ -80,8 +81,18 @@ At runtime (each click), the Netlify Function at `functions/datacenter.js`:
 | USDM polygons | Published every Thursday morning (US/Eastern) by the National Drought Mitigation Center. No action required — fetched live. |
 | USGS live streamflow | New observations arrive throughout the day; the app fetches the most recent available value per click. |
 | USGS historical percentile table | Static (1991–2020 window). Cached 30 days per function container. |
-| RDC 13-week forecast | Only refreshes when a new parquet is committed to `input_files/`. The build script picks the lexicographically latest `USGS_streamflow_drought_forecasts_*.parquet`. |
+| RDC 13-week forecast | Fetched live from the USGS CDN at every Netlify build. A GitHub Actions cron (`.github/workflows/weekly-forecast-refresh.yml`) triggers a rebuild every Wednesday at 6 PM UTC. Manual rebuilds also pick up fresh data. |
 | Datacenter inventory | Only refreshes when `input_files/datacenters.csv` is updated and the build script is re-run. |
+
+### Scheduled forecast refresh (setup required)
+
+A GitHub Actions workflow at `.github/workflows/weekly-forecast-refresh.yml` triggers a Netlify rebuild every Wednesday at 6 PM UTC so the site picks up fresh RDC forecasts from the USGS CDN.
+
+**One-time setup:**
+1. In **Netlify** → Site settings → Build hooks, create a hook named "Weekly forecast refresh" and copy the URL.
+2. In **GitHub** → Settings → Secrets → Actions, create a repository secret named `NETLIFY_BUILD_HOOK` with that URL as the value.
+
+The workflow can also be triggered manually from the Actions tab.
 
 ### Known limitations
 

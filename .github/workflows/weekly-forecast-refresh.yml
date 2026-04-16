@@ -1,0 +1,25 @@
+name: Weekly forecast refresh
+
+# USGS River DroughtCast publishes new forecasts weekly (typically mid-week).
+# This workflow triggers a Netlify rebuild every Wednesday at 6 PM UTC so the
+# site picks up fresh data via the CDN fetch in build_data.py.
+#
+# Setup:
+#   1. In Netlify → Site settings → Build hooks, create a hook named
+#      "Weekly forecast refresh" and copy the URL.
+#   2. In GitHub → Settings → Secrets → Actions, create a secret called
+#      NETLIFY_BUILD_HOOK with that URL as the value.
+
+on:
+  schedule:
+    - cron: '0 18 * * 3'   # every Wednesday 6 PM UTC
+  workflow_dispatch: {}     # allow manual trigger from Actions tab
+
+jobs:
+  trigger-rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netlify deploy
+        run: |
+          curl -sS -X POST "${{ secrets.NETLIFY_BUILD_HOOK }}" \
+            -w "\nHTTP %{http_code}\n"

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Terra Project</title>
+    <title>Data Center Drought Map</title>
 
     <!-- Mapbox GL JS v3.20.0 -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.20.0/mapbox-gl.css" rel="stylesheet" />
@@ -16,8 +16,8 @@
         <!-- ── Left: data panel ────────────────────── -->
         <aside id="left-pane">
             <header id="sidebar-header">
-                <h1>Terra Project</h1>
-                <p id="location-hint">Click a datacenter on the map to explore data</p>
+                <h1>Data Center Drought Map</h1>
+                <p id="location-hint">Click a data center on the map to explore data</p>
             </header>
 
             <div id="selected-location">
@@ -35,6 +35,20 @@
         <!-- ── Right: map ──────────────────────────── -->
         <main id="right-pane">
             <div id="map"></div>
+
+            <div id="drought-legend" class="map-overlay">
+                <label class="legend-header">
+                    <input type="checkbox" id="drought-toggle" checked disabled />
+                    <span>U.S. Drought Monitor</span>
+                </label>
+                <ul class="legend-scale">
+                    <li><span class="swatch" style="background:#f7dfb1"></span>D0 Abnormally Dry</li>
+                    <li><span class="swatch" style="background:#FCD37F"></span>D1 Moderate</li>
+                    <li><span class="swatch" style="background:#FFAA00"></span>D2 Severe</li>
+                    <li><span class="swatch" style="background:#E60000"></span>D3 Extreme</li>
+                    <li><span class="swatch" style="background:#730000"></span>D4 Exceptional</li>
+                </ul>
+            </div>
         </main>
 
     </div>

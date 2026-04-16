@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  Terra Project — app.js
+//  Data Center Drought Map — app.js
 //  Map: Mapbox GL JS v3.20.0 with OpenStreetMap raster tiles
 // ─────────────────────────────────────────────────────────────────────────────
 

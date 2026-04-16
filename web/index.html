@@ -35,6 +35,20 @@
         <!-- ── Right: map ──────────────────────────── -->
         <main id="right-pane">
             <div id="map"></div>
+
+            <div id="drought-legend" class="map-overlay">
+                <label class="legend-header">
+                    <input type="checkbox" id="drought-toggle" checked disabled />
+                    <span>U.S. Drought Monitor</span>
+                </label>
+                <ul class="legend-scale">
+                    <li><span class="swatch" style="background:#f7dfb1"></span>D0 Abnormally Dry</li>
+                    <li><span class="swatch" style="background:#FCD37F"></span>D1 Moderate</li>
+                    <li><span class="swatch" style="background:#FFAA00"></span>D2 Severe</li>
+                    <li><span class="swatch" style="background:#E60000"></span>D3 Extreme</li>
+                    <li><span class="swatch" style="background:#730000"></span>D4 Exceptional</li>
+                </ul>
+            </div>
         </main>
 
     </div>

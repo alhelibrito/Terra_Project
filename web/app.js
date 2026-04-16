@@ -61,8 +61,79 @@ map.on('style.load', () => {
         'star-intensity': 0.6
     });
 
+    loadDroughtOverlay();
     loadDatacenters();
 });
+
+// ── U.S. Drought Monitor (USDM) overlay ──────────────────────────────────────
+// Weekly drought classification polygons, DM = 0..4 (D0 Abnormally Dry → D4 Exceptional).
+// Public ArcGIS FeatureServer, open CORS, updated Thursdays.
+const USDM_URL =
+    'https://services5.arcgis.com/0OTVzJS4K09zlixn/ArcGIS/rest/services/USDM_current/FeatureServer/0/query' +
+    '?where=1%3D1&outSR=4326&f=geojson&returnGeometry=true&geometryPrecision=4';
+
+const USDM_COLORS = {
+    0: '#f7dfb1', // D0 Abnormally Dry
+    1: '#FCD37F', // D1 Moderate
+    2: '#FFAA00', // D2 Severe
+    3: '#E60000', // D3 Extreme
+    4: '#730000'  // D4 Exceptional
+};
+
+function loadDroughtOverlay() {
+    map.addSource('usdm', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        attribution:
+            'Drought: <a href="https://droughtmonitor.unl.edu" target="_blank">U.S. Drought Monitor</a>'
+    });
+
+    map.addLayer({
+        id: 'usdm-fill',
+        type: 'fill',
+        source: 'usdm',
+        paint: {
+            'fill-color': [
+                'match', ['to-number', ['get', 'DM']],
+                0, USDM_COLORS[0],
+                1, USDM_COLORS[1],
+                2, USDM_COLORS[2],
+                3, USDM_COLORS[3],
+                4, USDM_COLORS[4],
+                '#888888'
+            ],
+            'fill-opacity': 0.25
+        }
+    });
+
+    fetch(USDM_URL)
+        .then(r => {
+            if (!r.ok) throw new Error(`USDM HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(geojson => {
+            const src = map.getSource('usdm');
+            if (src) src.setData(geojson);
+            wireDroughtToggle();
+        })
+        .catch(err => {
+            console.error('Failed to load USDM overlay:', err);
+            const toggle = document.getElementById('drought-toggle');
+            if (toggle) toggle.disabled = true;
+        });
+}
+
+function wireDroughtToggle() {
+    const toggle = document.getElementById('drought-toggle');
+    if (!toggle) return;
+    toggle.disabled = false;
+    toggle.addEventListener('change', () => {
+        const vis = toggle.checked ? 'visible' : 'none';
+        if (map.getLayer('usdm-fill')) {
+            map.setLayoutProperty('usdm-fill', 'visibility', vis);
+        }
+    });
+}
 
 // ── Load + display datacenters ────────────────────────────────────────────────
 let selectedDcId = null;
@@ -150,6 +221,168 @@ function showErrorState() {
         </div>`;
 }
 
+// Streamflow percentile categories (WaterWatch convention, 1991–2020 baseline).
+const FLOW_CATEGORY_COLORS = {
+    'Much Below Normal': '#8B0000',
+    'Below Normal':      '#E65100',
+    'Normal':            '#4CAF50',
+    'Above Normal':      '#1565C0',
+    'Much Above Normal': '#0D47A1'
+};
+
+function categoryFromPct(pct) {
+    if (pct === null || pct === undefined) return null;
+    if (pct < 10)  return 'Much Below Normal';
+    if (pct < 25)  return 'Below Normal';
+    if (pct <= 75) return 'Normal';
+    if (pct <= 90) return 'Above Normal';
+    return 'Much Above Normal';
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+function formatAsOf(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric'
+    });
+}
+
+function renderStreamflowCard(sf, gage) {
+    if (!gage?.id) return '';
+
+    const cfs  = sf?.current_cfs;
+    const pct  = sf?.percentile;
+    const cat  = sf?.category;
+    const err  = sf?.current_error || sf?.stats_error;
+    const color = cat ? FLOW_CATEGORY_COLORS[cat] : 'var(--text-muted)';
+
+    const liveBlock = err
+        ? `<div class="sf-note">Live reading unavailable (${escapeHtml(err)}).</div>`
+        : cfs !== undefined
+          ? `
+            <div class="sf-readout">
+                <div class="sf-main">
+                    <span class="sf-value">${cfs.toLocaleString()}</span>
+                    <span class="sf-unit">cfs</span>
+                </div>
+                ${pct !== undefined ? `
+                <div class="sf-pct-row">
+                    <div class="sf-pct-bar">
+                        <div class="sf-pct-fill" style="width:${Math.max(1, Math.min(100, pct))}%;background:${color}"></div>
+                    </div>
+                    <div class="sf-pct-text">
+                        <span class="sf-pct-num">${pct}<span class="sf-pct-small">th</span></span>
+                        <span class="sf-pct-cat" style="color:${color}">${escapeHtml(cat || '')}</span>
+                    </div>
+                </div>` : ''}
+            </div>`
+          : '';
+
+    return `
+        <div class="chart-card">
+            <h3>Current Streamflow</h3>
+            ${liveBlock}
+            <div class="sf-meta">
+                <div class="dc-row">
+                    <span class="dc-label">Nearest USGS Gage</span>
+                    <span class="dc-value">${escapeHtml(gage.name || gage.id)}</span>
+                </div>
+                <div class="dc-row">
+                    <span class="dc-label">Gage ID · Distance</span>
+                    <span class="dc-value">
+                        <a href="https://waterdata.usgs.gov/monitoring-location/${gage.id}"
+                           target="_blank" rel="noopener">${gage.id}</a>
+                        · ${gage.distance_km} km
+                    </span>
+                </div>
+                ${sf?.as_of ? `
+                <div class="dc-row">
+                    <span class="dc-label">Observed</span>
+                    <span class="dc-value">${formatAsOf(sf.as_of)}${sf.baseline_years ? ` · percentile vs ${sf.baseline_years}` : ''}</span>
+                </div>` : ''}
+            </div>
+        </div>`;
+}
+
+function renderForecastCard(forecast) {
+    if (!forecast || forecast.length === 0) return '';
+
+    const W = 320, H = 140, PAD_L = 28, PAD_R = 8, PAD_T = 10, PAD_B = 28;
+    const innerW = W - PAD_L - PAD_R;
+    const innerH = H - PAD_T - PAD_B;
+    const n = forecast.length;
+    const barW = innerW / n * 0.7;
+    const step = innerW / n;
+
+    const bars = forecast.map((f, i) => {
+        const x = PAD_L + i * step + (step - barW) / 2;
+        const v = f.median_pct == null ? 0 : Math.max(0, Math.min(100, f.median_pct));
+        const h = (v / 100) * innerH;
+        const y = PAD_T + innerH - h;
+        const cat = categoryFromPct(f.median_pct);
+        const color = cat ? FLOW_CATEGORY_COLORS[cat] : '#555';
+
+        const p05 = f.p05 == null ? null : Math.max(0, Math.min(100, f.p05));
+        const p95 = f.p95 == null ? null : Math.max(0, Math.min(100, f.p95));
+        const ci = (p05 !== null && p95 !== null) ? `
+            <line x1="${x + barW / 2}" x2="${x + barW / 2}"
+                  y1="${PAD_T + innerH - (p95 / 100) * innerH}"
+                  y2="${PAD_T + innerH - (p05 / 100) * innerH}"
+                  stroke="#8892a8" stroke-width="1" opacity="0.6"/>` : '';
+
+        return `
+            <g>
+                <title>${f.date} — ${f.median_pct == null ? '—' : f.median_pct + 'th percentile'}</title>
+                <rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${color}" rx="1"/>
+                ${ci}
+            </g>`;
+    }).join('');
+
+    const yTicks = [0, 25, 50, 75, 100].map(v => {
+        const y = PAD_T + innerH - (v / 100) * innerH;
+        return `
+            <line x1="${PAD_L}" x2="${W - PAD_R}" y1="${y}" y2="${y}"
+                  stroke="#2a2f45" stroke-width="0.5"/>
+            <text x="${PAD_L - 4}" y="${y + 3}" fill="#8892a8" font-size="9"
+                  text-anchor="end">${v}</text>`;
+    }).join('');
+
+    // Month-aware x labels: show month abbreviation when it changes.
+    let lastMonth = null;
+    const xLabels = forecast.map((f, i) => {
+        const d = new Date(f.date);
+        const month = d.getUTCMonth();
+        const show = month !== lastMonth;
+        lastMonth = month;
+        if (!show) return '';
+        const x = PAD_L + i * step + step / 2;
+        const label = d.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
+        return `<text x="${x}" y="${H - 10}" fill="#8892a8" font-size="9" text-anchor="middle">${label}</text>`;
+    }).join('');
+
+    return `
+        <div class="chart-card">
+            <h3>13-Week Streamflow Forecast</h3>
+            <svg class="forecast-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+                ${yTicks}
+                ${bars}
+                ${xLabels}
+                <text x="${PAD_L - 20}" y="${PAD_T + innerH / 2}" fill="#8892a8" font-size="9"
+                      text-anchor="middle" transform="rotate(-90 ${PAD_L - 20} ${PAD_T + innerH / 2})">
+                    percentile
+                </text>
+            </svg>
+            <div class="sf-note">Ensemble of LSTM + LightGBM models. Whiskers show 5–95% prediction interval.</div>
+        </div>`;
+}
+
 function updateSidebar(props, coords) {
     const locationEl = document.getElementById('selected-location');
     const chartsEl   = document.getElementById('charts-container');
@@ -157,7 +390,7 @@ function updateSidebar(props, coords) {
     locationEl.innerHTML = `
         <div class="location-badge">
             <span class="dot"></span>
-            <span>${props.Name || 'Unknown Datacenter'}</span>
+            <span>${escapeHtml(props.Name || 'Unknown Datacenter')}</span>
         </div>`;
 
     const fields = [
@@ -173,24 +406,22 @@ function updateSidebar(props, coords) {
     const rows = fields.map(f => `
         <div class="dc-row">
             <span class="dc-label">${f.label}</span>
-            <span class="dc-value">${f.value}</span>
+            <span class="dc-value">${escapeHtml(f.value)}</span>
         </div>`).join('');
 
     const [lng, lat] = coords;
+    const streamflowCard = renderStreamflowCard(props.streamflow, props.gage);
+    const forecastCard   = renderForecastCard(props.forecast);
+
     chartsEl.innerHTML = `
+        ${streamflowCard}
+        ${forecastCard}
         <div class="chart-card dc-info">
             <h3>Datacenter Info</h3>
             ${rows}
-        </div>
-        <div class="chart-card">
-            <h3>Coordinates</h3>
             <div class="dc-row">
-                <span class="dc-label">Latitude</span>
-                <span class="dc-value">${lat.toFixed(6)}</span>
-            </div>
-            <div class="dc-row">
-                <span class="dc-label">Longitude</span>
-                <span class="dc-value">${lng.toFixed(6)}</span>
+                <span class="dc-label">Coordinates</span>
+                <span class="dc-value">${lat.toFixed(4)}, ${lng.toFixed(4)}</span>
             </div>
         </div>`;
 }
